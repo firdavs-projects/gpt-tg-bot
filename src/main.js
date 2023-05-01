@@ -34,7 +34,7 @@ bot.help((ctx) => ctx.reply(`
 bot.on(message('text'), async (ctx) => {
     ctx.session ??= INITIAL_SESSION
     try {
-        await ctx.reply(code('Обработка вашего сообщения...'))
+        await ctx.reply(code(`Обработка вашего сообщения, ${ctx?.message.from.first_name} ...`))
 
         ctx.session.messages.push({role: openai.roles.USER, content: ctx.message.text})
 
@@ -43,9 +43,11 @@ bot.on(message('text'), async (ctx) => {
         const response = await openai.chat(ctx.session.messages)
         ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content})
 
-        response.content
-            .split('```')
-            .map(async (text) => await ctx.reply(text.trim()))
+        response?.content
+            ? response?.content
+                .split('```')
+                .map(async (text) => await ctx.reply(text.trim()))
+            : await ctx.reply('Ошибка сервера')
 
     } catch (e) {
         console.log(`Error while voice message`, e.message)
@@ -55,7 +57,7 @@ bot.on(message('text'), async (ctx) => {
 bot.on(message('voice'), async (ctx) => {
     ctx.session ??= INITIAL_SESSION
     try {
-        await ctx.reply(code('Обработка вашего голосового сообщения...'))
+        await ctx.reply(code(`Обработка вашего голосового сообщения ${ctx?.message.from.first_name} ...`))
 
         const link = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
         const userId = String(ctx.message.from.id)
@@ -70,9 +72,11 @@ bot.on(message('voice'), async (ctx) => {
         const response = await openai.chat(ctx.session.messages)
         ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content})
 
-        response.content
-            .split('```')
-            .map(async (text) => await ctx.reply(text.trim()))
+        response?.content ?
+            response?.content
+                .split('```')
+                .map(async (text) => await ctx.reply(text.trim()))
+            : await ctx.reply('Ошибка сервера')
 
     } catch (e) {
         console.log(`Error while voice message`, e.message)
