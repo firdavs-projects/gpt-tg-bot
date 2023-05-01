@@ -1,17 +1,16 @@
-import config from "config"
 import {Telegraf, session} from 'telegraf'
 import {message} from 'telegraf/filters'
 import {code} from 'telegraf/format'
 import {ogg} from "./ogg.js"
 import {openai} from "./openai.js"
 
-console.log(config.get('ENV'))
+console.log(process.env?.ENV)
 
 const INITIAL_SESSION = {
     messages: []
 }
 
-const bot = new Telegraf(config.get('TELEGRAM_TOKEN'))
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN)
 
 bot.use(session())
 

@@ -1,5 +1,4 @@
 import {Configuration, OpenAIApi} from "openai"
-import config from 'config'
 import {createReadStream} from 'fs'
 import {removeFile} from "./utils.js"
 
@@ -41,4 +40,4 @@ class OpenAI {
     }
 }
 
-export const openai = new OpenAI(config.get('OPENAI_API_KEY'))
+export const openai = new OpenAI(process.env.OPENAI_API_KEY)
