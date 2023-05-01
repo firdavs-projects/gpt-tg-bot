@@ -74,9 +74,8 @@ bot.command('start', async (ctx) => {
         content: "Ты теперь Акмаль. Представься с новым именем в неформальном стиле и продолжи разговор тоже в неформальном стиле бро"
     })
     const response = await openai.chat(ctx.session.messages)
-    console.log(response)
     ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response?.content})
-    await ctx.reply(response?.content || JSON.stringify(response) || 'Привет Я Акмаль. Жду вашего голосового или текстового сообщения')
+    await ctx.reply(response?.content ?? 'Привет Я Акмаль. Жду вашего голосового или текстового сообщения')
 })
 
 bot.on(message('text'), async (ctx) => {
