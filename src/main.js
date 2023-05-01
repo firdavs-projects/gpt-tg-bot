@@ -16,29 +16,46 @@ const bot = new Telegraf(config.get('TELEGRAM_TOKEN'))
 bot.use(session())
 
 bot.command('new', async (ctx) => {
+    await ctx.reply('В процессе создания новой сессии ...')
     ctx.session = INITIAL_SESSION
-    await ctx.reply('Создана новая сессия. Жду вашего голосового или текстового сообщения')
+    ctx.session.messages.push({
+        role: openai.roles.USER,
+        content: "Создана новая сессия. Ты теперь Акмаль. Представься и напомни что у нас новая сессия"
+    })
+    const response = await openai.chat(ctx.session.messages)
+    ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content})
+    await ctx.reply(response?.content ?? 'Создана новая сессия. Жду вашего голосового или текстового сообщения')
 })
 
 bot.command('start', async (ctx) => {
+    await ctx.reply('Инициализация ...')
     ctx.session = INITIAL_SESSION
-    await ctx.reply('Привет Я могу связать вас с chatGPT. Жду вашего голосового или текстового сообщения')
+    ctx.session.messages.push({
+        role: openai.roles.USER,
+        content: "Ты теперь Акмаль. Представься пожалуйста с новым именем как положено"
+    })
+    const response = await openai.chat(ctx.session.messages)
+    ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content})
+    await ctx.reply(response?.content ?? 'Привет Я Акмаль. Жду вашего голосового или текстового сообщения')
 })
 
-bot.help((ctx) => ctx.reply(`
-/new - Обновить сессию
-/start - Запуск бота
-/help - Помощь
-`))
+bot.use(async (ctx, next) => {
+    const botName = `@${ctx.botInfo.username}`
+    if (
+        ctx.message &&
+        (ctx.message.chat.type === 'group' || ctx.message.chat.type === 'supergroup') &&
+        ctx.message.text.includes(botName)
+    ) {
+        ctx.session ??= INITIAL_SESSION
+        const text = ctx.message.text
+            .replace(botName, '').trim()
 
-bot.on(message('text'), async (ctx) => {
-    ctx.session ??= INITIAL_SESSION
-    try {
+        ctx.session.messages.push({
+            role: openai.roles.USER,
+            content: text || "Представься Акмаль"
+        })
+
         await ctx.reply(code(`Обработка вашего сообщения, ${ctx?.message.from.first_name} ...`))
-
-        ctx.session.messages.push({role: openai.roles.USER, content: ctx.message.text})
-
-        await ctx.reply(code(`Ваш запрос: ${ctx.message.text}\nЖду ответа GPT ...`))
 
         const response = await openai.chat(ctx.session.messages)
         ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content})
@@ -49,37 +66,71 @@ bot.on(message('text'), async (ctx) => {
                 .map(async (text) => await ctx.reply(text.trim()))
             : await ctx.reply('Ошибка сервера')
 
-    } catch (e) {
-        console.log(`Error while voice message`, e.message)
+    }
+    return next();
+});
+
+
+// bot.use(Telegraf.log());
+
+bot.help((ctx) => ctx.reply(`
+/new - Обновить сессию
+/start - Запуск бота
+/help - Помощь
+`))
+
+bot.on(message('text'), async (ctx) => {
+    ctx.session ??= INITIAL_SESSION
+    if (ctx.message.chat.type === 'private') {
+        try {
+            await ctx.reply(code(`Обработка вашего сообщения, ${ctx?.message.from.first_name} ...`))
+            ctx.session.messages.push({role: openai.roles.USER, content: ctx.message.text})
+
+            // await ctx.reply(code(`Ваше сообщение: ${ctx.message.text}\nОбработка ...`))
+
+            const response = await openai.chat(ctx.session.messages)
+            ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content})
+
+            response?.content
+                ? response?.content
+                    .split('```')
+                    .map(async (text) => await ctx.reply(text.trim()))
+                : await ctx.reply('Ошибка сервера')
+
+        } catch (e) {
+            console.log(`Error while voice message`, e.message)
+        }
     }
 })
 
 bot.on(message('voice'), async (ctx) => {
     ctx.session ??= INITIAL_SESSION
-    try {
-        await ctx.reply(code(`Обработка вашего голосового сообщения ${ctx?.message.from.first_name} ...`))
+    if (ctx.message.chat.type === 'private') {
+        try {
+            await ctx.reply(code(`Обработка вашего голосового сообщения, ${ctx?.message.from.first_name} ...`))
 
-        const link = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
-        const userId = String(ctx.message.from.id)
-        const oggPath = await ogg.create(link.href, userId)
-        const mp3Path = await ogg.toMp3(oggPath, userId)
+            const link = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
+            const userId = String(ctx.message.from.id)
+            const oggPath = await ogg.create(link.href, userId)
+            const mp3Path = await ogg.toMp3(oggPath, userId)
 
-        const text = await openai.transcription(mp3Path)
-        ctx.session.messages.push({role: openai.roles.USER, content: text})
+            const text = await openai.transcription(mp3Path)
+            ctx.session.messages.push({role: openai.roles.USER, content: text})
 
-        await ctx.reply(code(`Ваш запрос: ${text}\nЖду ответа GPT ...`))
+            await ctx.reply(code(`Ваше сообщение: ${text}\nОбработка ...`))
 
-        const response = await openai.chat(ctx.session.messages)
-        ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content})
+            const response = await openai.chat(ctx.session.messages)
+            ctx.session.messages.push({role: openai.roles.ASSISTANT, content: response.content})
 
-        response?.content ?
-            response?.content
-                .split('```')
-                .map(async (text) => await ctx.reply(text.trim()))
-            : await ctx.reply('Ошибка сервера')
+            response?.content ?
+                response?.content
+                    .split('```')
+                    .map(async (text) => await ctx.reply(text.trim()))
+                : await ctx.reply('Ошибка сервера')
 
-    } catch (e) {
-        console.log(`Error while voice message`, e.message)
+        } catch (e) {
+            console.log(`Error while voice message`, e.message)
+        }
     }
 })
 
